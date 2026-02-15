@@ -114,8 +114,9 @@ export default function PollPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-gray-800">BuffiPoll</h1>
+        <div className="text-center mb-8 flex flex-col items-center gap-4">
+          <img src="/buffycorn.png" alt="BuffyCorn" className="w-24 h-24 object-contain" />
+          <h1 className="text-3xl md:text-5xl font-bold text-blue-700 break-all">buffipoll.vercel.app</h1>
         </div>
 
         <div className="result-card mb-8">
