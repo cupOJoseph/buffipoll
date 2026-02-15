@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.vote-button {
+  display: block;
+  width: 100%;
+  padding: 1.25rem 1.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e40af;
+  background: #eff6ff;
+  border: 2px solid #bfdbfe;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.vote-button:hover {
+  background: #1e40af;
+  color: white;
+  border-color: #1e40af;
+  transform: scale(1.02);
+}
+
+.result-card {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.07);
+  padding: 1.5rem;
+}
+
+.percentage-bar {
+  border-radius: 0.5rem;
+  transition: width 0.5s ease;
+}
+
+.admin-button {
+  display: inline-block;
+  padding: 0.625rem 1.25rem;
+  font-weight: 600;
+  color: white;
+  background: #3b82f6;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.admin-button:hover {
+  background: #2563eb;
+}
+.admin-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.admin-input {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  transition: border-color 0.15s;
+}
+.admin-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
