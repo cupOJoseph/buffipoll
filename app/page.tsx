@@ -1,7 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
 
 interface PollOption {
   id: string;
@@ -10,6 +9,7 @@ interface PollOption {
 }
 
 interface PollData {
+  pollId: string;
   question: string;
   options: PollOption[];
   totalVotes: number;
@@ -21,43 +21,37 @@ export default function PollPage() {
   const [votedFor, setVotedFor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const currentPollId = useRef<string | null>(null);
 
-  // Check if user has voted (localStorage)
-  useEffect(() => {
-    const voted = localStorage.getItem('buffipoll-voted');
-    const votedOption = localStorage.getItem('buffipoll-voted-for');
-    if (voted === 'true') {
+  // Check localStorage vote state for current poll
+  const checkVoteState = (pollId: string) => {
+    const storedPollId = localStorage.getItem('buffipoll-pollId');
+    if (storedPollId === pollId) {
       setHasVoted(true);
-      setVotedFor(votedOption);
+      setVotedFor(localStorage.getItem('buffipoll-voted-for'));
+    } else {
+      // Different poll — clear old vote
+      localStorage.removeItem('buffipoll-pollId');
+      localStorage.removeItem('buffipoll-voted-for');
+      setHasVoted(false);
+      setVotedFor(null);
     }
-  }, []);
-
-  // Fetch poll data initially
-  useEffect(() => {
-    fetchPollData();
-  }, []);
-
-  // Poll for updates every 2 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      fetchPollData(false); // Don't show loading on updates
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, []);
+  };
 
   const fetchPollData = async (showLoading = true) => {
     try {
       if (showLoading) setLoading(true);
       setError(null);
-
       const response = await fetch('/api/poll');
-      if (!response.ok) {
-        throw new Error('Failed to fetch poll data');
-      }
-
-      const data = await response.json();
+      if (!response.ok) throw new Error('Failed to fetch poll data');
+      const data: PollData = await response.json();
       setPollData(data);
+
+      // If poll changed, reset vote state
+      if (data.pollId !== currentPollId.current) {
+        currentPollId.current = data.pollId;
+        checkVoteState(data.pollId);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -65,27 +59,25 @@ export default function PollPage() {
     }
   };
 
+  useEffect(() => { fetchPollData(); }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => fetchPollData(false), 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   const handleVote = async (optionId: string) => {
     if (hasVoted) return;
-
     try {
       const response = await fetch('/api/poll', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ optionId }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit vote');
-      }
-
-      const updatedData = await response.json();
+      if (!response.ok) throw new Error('Failed to submit vote');
+      const updatedData: PollData = await response.json();
       setPollData(updatedData);
-      
-      // Mark as voted in localStorage
-      localStorage.setItem('buffipoll-voted', 'true');
+      localStorage.setItem('buffipoll-pollId', updatedData.pollId);
       localStorage.setItem('buffipoll-voted-for', optionId);
       setHasVoted(true);
       setVotedFor(optionId);
@@ -94,9 +86,8 @@ export default function PollPage() {
     }
   };
 
-  const getPercentage = (votes: number, total: number) => {
-    return total > 0 ? Math.round((votes / total) * 100) : 0;
-  };
+  const pct = (votes: number, total: number) =>
+    total > 0 ? Math.round((votes / total) * 100) : 0;
 
   if (loading) {
     return (
@@ -112,12 +103,7 @@ export default function PollPage() {
         <div className="text-center">
           <div className="text-4xl font-bold text-red-600 mb-4">Error</div>
           <div className="text-xl text-red-500">{error}</div>
-          <button
-            onClick={() => fetchPollData()}
-            className="mt-4 bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded transition-colors duration-200"
-          >
-            Retry
-          </button>
+          <button onClick={() => fetchPollData()} className="mt-4 admin-button">Retry</button>
         </div>
       </div>
     );
@@ -128,19 +114,11 @@ export default function PollPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-5xl font-bold text-gray-800 mb-4">BuffiPoll</h1>
-          <Link
-            href="/admin"
-            className="inline-block bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded transition-colors duration-200 text-sm"
-          >
-            Admin Panel
-          </Link>
+          <h1 className="text-5xl font-bold text-gray-800">BuffiPoll</h1>
         </div>
 
-        {/* Poll Question */}
-        <div className="bg-white shadow-lg rounded-lg p-6 border-2 border-gray-200 mb-8">
+        <div className="result-card mb-8">
           <h2 className="text-4xl font-bold text-center text-gray-800 mb-2">
             {pollData.question}
           </h2>
@@ -154,43 +132,30 @@ export default function PollPage() {
           )}
         </div>
 
-        {/* Poll Options */}
         <div className="space-y-4">
           {pollData.options.map((option) => {
-            const percentage = getPercentage(option.votes, pollData.totalVotes);
+            const percentage = pct(option.votes, pollData.totalVotes);
             const isVotedFor = votedFor === option.id;
-
             return (
-              <div key={option.id} className="bg-white shadow-lg rounded-lg p-6 border-2 border-gray-200">
+              <div key={option.id} className="result-card">
                 {!hasVoted ? (
-                  // Voting mode
-                  <button
-                    onClick={() => handleVote(option.id)}
-                    className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-lg text-2xl transition-colors duration-200 w-full min-h-20 text-left"
-                    disabled={hasVoted}
-                  >
+                  <button onClick={() => handleVote(option.id)} className="vote-button w-full text-left">
                     {option.text}
                   </button>
                 ) : (
-                  // Results mode
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className={`text-2xl font-semibold ${isVotedFor ? 'text-green-600' : 'text-gray-800'}`}>
                         {isVotedFor && '✓ '}{option.text}
                       </span>
-                      <span className="text-xl font-bold text-gray-600">
-                        {percentage}%
-                      </span>
+                      <span className="text-xl font-bold text-gray-600">{percentage}%</span>
                     </div>
-                    
-                    {/* Progress bar */}
                     <div className="bg-gray-200 rounded-lg h-8 overflow-hidden">
                       <div
-                        className={`h-full rounded-r-lg transition-all duration-500 ease-out ${isVotedFor ? 'bg-green-500' : 'bg-blue-500'}`}
+                        className={`percentage-bar h-full ${isVotedFor ? 'bg-green-500' : 'bg-blue-500'}`}
                         style={{ width: `${percentage}%` }}
-                      ></div>
+                      />
                     </div>
-                    
                     <div className="text-right text-gray-600">
                       {option.votes} vote{option.votes !== 1 ? 's' : ''}
                     </div>
@@ -201,10 +166,9 @@ export default function PollPage() {
           })}
         </div>
 
-        {/* Instructions */}
         <div className="mt-8 text-center text-gray-600">
           {!hasVoted ? (
-            <p className="text-lg">Click on an option to vote!</p>
+            <p className="text-lg">Tap an option to vote!</p>
           ) : (
             <p className="text-lg">Results update automatically every 2 seconds</p>
           )}
